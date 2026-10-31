@@ -2229,6 +2229,104 @@ function pathShape(shape, r) {
   ctx.closePath();
 }
 
+const PIXEL_ENEMY_SPRITE = [
+  "...HHH...",
+  "..HHHHH..",
+  ".HHHHHHH.",
+  ".HHSSSHH.",
+  ".HSESESH.",
+  "..HSSSH..",
+  "...HGH...",
+  "..KAAAK..",
+  ".KAAAAAK.",
+  "..KAKAK..",
+  "..KK.KK.."
+];
+
+const PIXEL_CASTER_SPRITE = [
+  "...HHH...",
+  "..HHHHH..",
+  ".HHHHHHH.",
+  ".HSSSSSH.",
+  ".HSESESH.",
+  "..HSSSH..",
+  "...HGH...",
+  "..KAAAK..",
+  ".KAAAAAK.",
+  "..KK.KK..",
+  "..KK.KK.."
+];
+
+const PIXEL_BOSS_SPRITE = [
+  "....GGG....",
+  "...GKKKG...",
+  "..KKHHHKK..",
+  ".KHHHHHHHK.",
+  ".KHSSSSSHK.",
+  ".KHSESESHK.",
+  "..KHSSSHK..",
+  ".KKAAAAAKK.",
+  "KKAAAAAAAKK",
+  ".KAAAKAAAK.",
+  ".KKKK.KKKK.",
+  "..KK...KK..",
+  "..K.....K.."
+];
+
+const PIXEL_CASTER_TYPES = new Set(["mage", "sorcerer", "witch", "demon", "void", "archon"]);
+
+function drawPixelEnemy(e) {
+  const sprite = e.boss
+    ? PIXEL_BOSS_SPRITE
+    : PIXEL_CASTER_TYPES.has(e.type)
+      ? PIXEL_CASTER_SPRITE
+      : PIXEL_ENEMY_SPRITE;
+  const pixel = Math.max(2, Math.round(e.visualR / 7));
+  const colors = {
+    K: "#11101a",
+    H: "#302331",
+    S: "#e7b78f",
+    E: "#fff1bd",
+    G: e.boss ? "#ffe36a" : "#f1d276",
+    A: e.flash > 0 ? "#ffffff" : e.color
+  };
+  const top = -sprite.length * pixel / 2;
+
+  for (let row = 0; row < sprite.length; row++) {
+    const left = -sprite[row].length * pixel / 2;
+    for (let col = 0; col < sprite[row].length; col++) {
+      const shade = sprite[row][col];
+      if (shade === "." || shade === " ") continue;
+      ctx.fillStyle = e.flash > 0 ? "#ffffff" : colors[shade];
+      ctx.fillRect(
+        Math.round(left + col * pixel),
+        Math.round(top + row * pixel),
+        pixel,
+        pixel
+      );
+    }
+  }
+
+  if (e.boss || e.attackType === "melee" || e.attackType === "boss") {
+    ctx.fillStyle = e.flash > 0 ? "#ffffff" : (e.boss ? "#fff0c8" : "#dce8f2");
+    ctx.fillRect(pixel * 2, -pixel, pixel, pixel);
+    ctx.fillRect(pixel * 3, -pixel * 2, pixel, pixel * 2);
+    ctx.fillRect(pixel * 4, -pixel * 3, pixel, pixel * 3);
+  } else if (e.attackType === "shoot" || e.attackType === "multi") {
+    ctx.fillStyle = e.flash > 0 ? "#ffffff" : e.bulletColor;
+    ctx.fillRect(pixel * 2, -pixel * 2, pixel, pixel * 2);
+    ctx.fillRect(pixel * 3, -pixel * 3, pixel, pixel);
+    ctx.fillRect(pixel * 3, pixel, pixel, pixel);
+  }
+
+  if (e.frontShield) {
+    ctx.fillStyle = e.flash > 0 ? "#ffffff" : "#d8e4ef";
+    ctx.fillRect(pixel * 3, -pixel * 2, pixel * 2, pixel);
+    ctx.fillRect(pixel * 4, -pixel, pixel * 2, pixel * 3);
+    ctx.fillRect(pixel * 3, pixel * 2, pixel * 2, pixel);
+  }
+}
+
 function drawBackground() {
   ctx.fillStyle = currentTheme.bg;
   ctx.fillRect(0, 0, viewW, viewH);
@@ -2298,23 +2396,7 @@ function drawEnemies() {
     ctx.translate(sx, sy);
     ctx.rotate(e.angle);
 
-    pathShape(e.shape, e.visualR);
-    ctx.fillStyle = e.flash > 0 ? "#ffffff" : e.color;
-    ctx.fill();
-
-    if (e.isBoss) {
-      ctx.lineWidth = e.visualR * 0.18;
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.stroke();
-    }
-
-    if (e.frontShield) {
-      ctx.beginPath();
-      ctx.arc(0, 0, e.visualR * 1.05, -0.9, 0.9);
-      ctx.lineWidth = e.visualR * 0.25;
-      ctx.strokeStyle = "#d8e4ef";
-      ctx.stroke();
-    }
+    drawPixelEnemy(e);
 
     ctx.restore();
 
@@ -2354,7 +2436,6 @@ function drawPlayerBase() {
 
   const sx = wx(player.x);
   const sy = wy(player.y);
-  const r = player.r;
 
   ctx.save();
   ctx.translate(sx, sy);
@@ -2362,32 +2443,52 @@ function drawPlayerBase() {
 
   if (player.invuln > 0 && player.flash <= 0) ctx.globalAlpha = 0.55;
 
-  ctx.fillStyle = player.flash > 0 ? "#ffffff" : "#d23a48";
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+  const pixel = Math.max(2, Math.round(player.r / 6));
+  const sprite = [
+    "....KK...",
+    "...KKKK..",
+    "..KSSSEK.",
+    "...KSSK..",
+    ".KKRRRRK.",
+    "KKRRGRRRK",
+    ".KRRGGRK.",
+    "..KBBBK..",
+    "..KB.BK..",
+    "..KBBBK..",
+    "...K.K..."
+  ];
+  const colors = {
+    K: "#17101c",
+    S: "#f6c493",
+    E: "#fff0c8",
+    R: "#d23a48",
+    G: "#ffd56a",
+    B: "#203048"
+  };
+  const left = -sprite[0].length * pixel / 2;
+  const top = -sprite.length * pixel / 2;
 
-  ctx.fillStyle = "#203048";
-  ctx.beginPath();
-  ctx.arc(r * 0.18, 0, r * 0.38, 0, Math.PI * 2);
-  ctx.fill();
+  for (let row = 0; row < sprite.length; row++) {
+    for (let col = 0; col < sprite[row].length; col++) {
+      const shade = sprite[row][col];
+      if (shade === ".") continue;
+      ctx.fillStyle = player.flash > 0 ? "#ffffff" : colors[shade];
+      ctx.fillRect(
+        Math.round(left + col * pixel),
+        Math.round(top + row * pixel),
+        pixel,
+        pixel
+      );
+    }
+  }
 
-  ctx.fillStyle = "#0b1220";
-  ctx.beginPath();
-  ctx.arc(r * 0.55, 0, r * 0.24, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = player.specialTimer > 0 ? "#ffffff" : "#dce8f2";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(r * 0.25, 0);
-  ctx.lineTo(r * 2.45, 0);
-  ctx.stroke();
-
-  ctx.fillStyle = "#8d1f2b";
-  ctx.beginPath();
-  ctx.arc(r * 0.3, 0, 4, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = player.specialTimer > 0 ? "#ffffff" : "#8d1f2b";
+  ctx.fillRect(-pixel, -pixel * 2, pixel * 2, pixel);
+  ctx.fillStyle = player.specialTimer > 0 ? "#ffffff" : "#ffd56a";
+  ctx.fillRect(pixel, -pixel * 3, pixel, pixel);
+  ctx.fillRect(pixel, -pixel, pixel, pixel);
+  ctx.fillStyle = player.specialTimer > 0 ? "#ffffff" : "#dce8f2";
+  ctx.fillRect(pixel * 2, -pixel * 2, pixel * 5, pixel);
 
   ctx.globalAlpha = 1;
   ctx.restore();
